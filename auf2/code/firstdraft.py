@@ -1,36 +1,3 @@
-#Description: die input Funktion für die Labyrinthe ohne Gruben; Dabei ist ein feld mit einer 0 ein Feld ohne Wand rechts und unten,
-#1 mit Wand rechts, ein Feld 2 mit Wand unten, ein Feld 3 mit Wand unten und rechts.
-def input_ohne_gruben(filename: str):
-    matrizen = []
-    with open(filename, 'r') as f:
-        #Höhe m und Breite n der Matrix
-        n,m = f.readline().split()
-        n,m = int(n), int(m)
-        for x in range(2):
-            matrix = []
-            for line in range(m):
-                new_line = []
-                for element in f.readline().split():
-                    if element == '0':
-                        new_line.append(0)
-                    else:
-                        new_line.append(1)
-                new_line.append(1)
-                matrix.append(new_line)
-            for line in range(m-1):
-                current_line = f.readline().split()
-                for index in range(n):
-                    if current_line[index] == 1:
-                        if matrix[line+1][index] == 0:
-                            matrix[line+1][index] = 2
-                        else:
-                            matrix[line+1][index] = 3
-            for i in range(int(f.readline().split()[0])):
-                f.readline()
-                pass
-            matrizen.append(matrix)
-    return matrizen, m, n
-
 def binary_maze(filename: str) -> list[list, int, int]:
     matrizen = []
     with open(filename, "r") as f:
@@ -60,6 +27,8 @@ def binary_maze(filename: str) -> list[list, int, int]:
             for i in range(int(f.readline().split()[0])):
                 f.readline()
                 pass
+            matrix[0][1] = "S "
+            matrix[-1][-2] = "X "
             new_line=[]
             for i in range(2*n+1):
                 new_line.append("# ")
@@ -68,6 +37,13 @@ def binary_maze(filename: str) -> list[list, int, int]:
             matrizen.append(matrix)
     return matrizen, m, n
 
-output = binary_maze("auf2/data/labyrinthe1.txt")
-for line in output[0][0]:
-    print("".join(line))
+def print_maze(output: list[list, int, int]):
+    print("Matrix 1")
+    for line in output[0][0]:
+        print("".join(line))
+        print("Matrix 2")
+    for line in output[0][1]:
+        print("".join(line))
+    return 0
+
+print_maze(binary_maze("auf2/data/labyrinthe1.txt"))
