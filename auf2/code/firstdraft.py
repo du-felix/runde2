@@ -1,3 +1,11 @@
+class Point:
+    def __init__(self, x: int, y: int):
+        self.x = x
+        self.y = y
+
+
+#Das generierte Labyrinth generiert für jedes Feld aus der Originaleingabe, zwei Felder, eins für das Feld, das andere, um die Wände zu speichern.
+#Somit entsprechen zwei Schritte im Labyrinth einem Schritt in der Originaleingabe. 
 def binary_maze(filename: str) -> list[list, int, int]:
     matrizen = []
     with open(filename, "r") as f:
@@ -45,5 +53,9 @@ def print_maze(output: list[list, int, int]):
     for line in output[0][1]:
         print("".join(line))
     return 0
+
+#Eventuell später auch mit Backtracking implementierbar. Wäre gut als Vergleich der Laufzeiten.
+def bfs_shortest_path(maze, m, n) -> list[list, int]:
+    pass
 
 print_maze(binary_maze("auf2/data/labyrinthe1.txt"))
