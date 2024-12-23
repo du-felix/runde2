@@ -1,0 +1,14 @@
+Jede Datei beschreibt die beiden Labyrinthe. In der 1. Zeile werden Breite n und Höhe m der beiden Labyrinthe angegeben.
+Danach werden die Labyrinthe nacheinander jeweils so definiert:
+
+m Zeilen mit je n-1 Einträgen: Für jede Labyrinthzeile wird für jedes Feld angegeben,
+ob rechts davon eine vertikale Wand ist oder nicht. Eine 1 steht für eine Wand, eine 0 für keine Wand.
+
+m-1 Zeilen mit je n Einträgen: Für jede Labyrinthzeile wird für jedes Feld angegeben,
+ob unterhalb des Feldes eine horizontale Wand ist oder nicht. Eine 1 steht für eine Wand, eine 0 für keine Wand.
+
+1 Zeile: Anzahl g der Gruben.
+
+g Zeilen: Pro Zeile die Koordinate einer Gruben im Labyrinth im Format xy.
+Die Koordinate (0,0) entspricht der Startposition, also der oberen linken Eckposition.
+Gibt es keine Gruben, folgen direkt die Angaben für das zweite Labyrinth beginnend bei den Angaben zu den vertikalen Wänden.
