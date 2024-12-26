@@ -47,19 +47,36 @@ G, n, m = get_graph("./auf2/data/labyrinthe0.txt")
 
 nodes = list(G.nodes())
 edges = list(G.edges())
+M=len(nodes)
 
 source = 0
 destination = n * m - 1
 
 problem = pl.LpProblem("Shortest Path Problem", pl.LpMinimize)
 edge_vars = {edge: pl.LpVariable(f"x_{edge[0]}_{edge[1]}", cat="Binary") for edge in edges}
+# Position variables for each node (integer variables)
+position_vars = {i: pl.LpVariable(f"p_{i}", lowBound=0, upBound=n-1, cat="Integer") for i in nodes}
 
-# Objective Function
+# Objective: Minimize the number of edges selected (can also be weighted)
 problem += pl.lpSum([edge_vars[edge] for edge in edges])
+
+# Position constraints (ensuring the path is continuous)
+for (i, j) in edges:
+    # Ensuring that p[j] is one greater than p[i] if edge (i, j) is used
+    problem += position_vars[j] >= position_vars[i] + 1 - M * (1 - edge_vars[(i, j)]), f"Position_Constraint_{i}_{j}"
+    # Ensuring that p[i] is one greater than p[j] if edge (j, i) is used
+    problem += position_vars[i] >= position_vars[j] + 1 - M * (1 - edge_vars[(i, j)]), f"Position_Constraint_{j}_{i}"
+
+# Source node must be at position 0
+problem += position_vars[source] == 0, "Source_Position"
+
+# Destination node must be at position n-1
+problem += position_vars[destination] == n-1, "Destination_Position"
+
 # Source Node muss für eine Kante ausgehend sein
-problem += pl.lpSum([edge_vars[edge] for edge in edges if edge[0] == source or edge[1] == source]) == 1
+#problem += pl.lpSum([edge_vars[edge] for edge in edges if edge[0] == source]) == 1
 # Destination Node muss für eine Kante eingehend sein
-problem += pl.lpSum([edge_vars[edge] for edge in edges if edge[1] == destination or edge[0] == destination]) == 1
+#problem += pl.lpSum([edge_vars[edge] for edge in edges if edge[1] == destination]) == 1
 
 # Outgoing - Incoming = 0 für alle Knoten, außer Source und Destination
 for node in nodes:
@@ -71,21 +88,35 @@ for node in nodes:
 # Solve the problem
 status = problem.solve()
 
-# Display the solver status
-print(f"Solver Status: {pl.LpStatus[problem.status]}")
-
-# Check if the solution is optimal
+# Objective Function
+# Extract the results
 if pl.LpStatus[problem.status] == "Optimal":
-    print("\nOptimal Solution Found:")
+    print("Optimal Path Found:")
+    selected_edges = [(i, j) for (i, j) in edges if pl.value(edge_vars[(i, j)]) == 1]
+    print("Selected Edges:", selected_edges)
     
-    # Retrieve the values of edge variables
-    for edge, var in edge_vars.items():
-        print(f"Edge {edge}: Used = {var.varValue}")
-    
-    # Retrieve the optimal objective value
-    print(f"\nOptimal Total Cost: {pl.value(problem.objective)}")
+    # Also print the positions of the nodes in the path
+    for node in nodes:
+        print(f"Node {node} is at position {pl.value(position_vars[node])}")
 else:
     print("No optimal solution found.")
+
+while False:
+    # Display the solver status
+    print(f"Solver Status: {pl.LpStatus[problem.status]}")
+
+    # Check if the solution is optimal
+    if pl.LpStatus[problem.status] == "Optimal":
+        print("\nOptimal Solution Found:")
+        
+        # Retrieve the values of edge variables
+        for edge, var in edge_vars.items():
+            print(f"Edge {edge}: Used = {var.varValue}")
+        
+        # Retrieve the optimal objective value
+        print(f"\nOptimal Total Cost: {pl.value(problem.objective)}")
+    else:
+        print("No optimal solution found.")
 
 # Print all constraints
 while False:
