@@ -1,1 +1,8 @@
 Keywords: Motion Planning, Loosely Coupled Motion Planning
+
+Lösungsidee:
+minimize x1 + x2
+movement constraint
+positional args for path
+
+rückführen der zwei paths auf eine commandfolge

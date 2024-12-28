@@ -3,6 +3,17 @@ import networkx as nx
 import  matplotlib.pyplot as plt
 import time as t
 
+class Graph:
+    def __init__(self):
+        self.graph = {}
+        self.edges = []
+        self.nodes = []
+
+    def add_node(self, node):
+        self.nodes.append(node)
+    def add_edge(self, u, v):
+        self.edges.append((u,v))
+        self.edges.append((v,u))
 #Breite n, Höhe m
 #Source: 0, Destination: m*n-1
 #0 = Add Edge, 1 = Wand
@@ -45,10 +56,47 @@ def get_graph(filename):
                     pass
     return G, n, m
 
-G, n, m = get_graph("./auf2/data/labyrinthe0.txt")
+def get_graph_own_class(filename):
+    with open(filename, "r") as f:
+        #n, m lesen
+        n,m = f.readline().split()
+        n,m = int(n), int(m)
 
-nodes = list(G.nodes())
-edges = list(G.edges())
+        #Initialize Graph Nodes
+        G = Graph()
+        for i in range(m*n):
+            G.add_node(i)
+
+        #Alle horizontalen Kanten
+        for lines in range(m):
+            current_line = f.readline().split()
+            for index in range(n-1):
+                element = int(current_line[index])
+                if int(element) == 0:
+                    source_node = lines*n+index
+                    destination_node = lines*n+index+1
+                    G.add_edge(source_node, destination_node)
+                else:
+                    pass
+        
+        #Alle vertikalen Kanten
+        for lines in range(m-1):
+            current_line = f.readline().split()
+            for index in range(n):
+                element = int(current_line[index])
+                if int(element) == 0:
+                    source_node = lines*n+index
+                    destination_node = (lines+1)*n+index
+                    G.add_edge(source_node, destination_node)
+                else:
+                    pass
+    return G, n, m
+
+
+G, n, m = get_graph("./auf2/data/laby0_short2.txt")
+
+nodes = list(G.nodes)
+edges = list(G.edges)
 
 source = 0
 destination = n * m - 1
@@ -76,19 +124,24 @@ for node in nodes:
 # Solve the problem
 status = problem.solve()
 
+def print_sol():
+    # Display the solver status
+    print(f"Solver Status: {pl.LpStatus[problem.status]}")
 
-# Display the solver status
-print(f"Solver Status: {pl.LpStatus[problem.status]}")
+    # Check if the solution is optimal
 
-# Check if the solution is optimal
+    # Retrieve the values of edge variables
+    for edge, var in edge_vars.items():
+        print(f"Edge {edge}: Used = {var.varValue}")
 
-# Retrieve the values of edge variables
-for edge, var in edge_vars.items():
-    print(f"Edge {edge}: Used = {var.varValue}")
+    for edge, var in edge_vars.items():
+        if var.varValue == 1:
+            print(edge)
 
-# Retrieve the optimal objective value
-print(f"\nOptimal Total Cost: {pl.value(problem.objective)}")
+    # Retrieve the optimal objective value
+    print(f"\nOptimal Total Cost: {float(len(edges)) - pl.value(problem.objective)}")
 
+print_sol()
 
 # Print all constraints
 while False:
