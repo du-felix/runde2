@@ -93,7 +93,7 @@ def get_graph_own_class(filename):
     return G, n, m
 
 
-G, n, m = get_graph("./auf2/data/laby0_short2.txt")
+G, n, m = get_graph_own_class("./auf2/data/labyrinthe0.txt")
 
 nodes = list(G.nodes)
 edges = list(G.edges)
@@ -102,7 +102,7 @@ source = 0
 destination = n * m - 1
 
 problem = pl.LpProblem("Shortest Path Problem", pl.LpMinimize)
-edge_vars = {edge: pl.LpVariable(f"x_{edge[0]}_{edge[1]}", cat="Binary") for edge in edges}
+edge_vars = {edge: pl.LpVariable(f"x_{edge[0]}_{edge[1]}", lowBound=-1, upBound=1) for edge in edges}
 
 # Objective: Minimize the number of edges selected (can also be weighted)
 problem += pl.lpSum([edge_vars[edge] for edge in edges])
@@ -114,6 +114,11 @@ problem += pl.lpSum([edge_vars[edge] for edge in edges if edge[0] == source]) ==
 # Destination Node muss für eine Kante eingehend sein
 problem += pl.lpSum([edge_vars[edge] for edge in edges if edge[1] == destination]) == 1
 
+# Add constraint for opposite flow on bidirectional edges
+for i, j in edges:
+    # Find the corresponding reverse edge (j,i)
+    if (j, i) in edges:
+        problem += edge_vars[(i,j)] == -edge_vars[(j,i)]
 # Outgoing - Incoming = 0 für alle Knoten, außer Source und Destination
 for node in nodes:
     if node == source or node == destination:
@@ -133,13 +138,14 @@ def print_sol():
     # Retrieve the values of edge variables
     for edge, var in edge_vars.items():
         print(f"Edge {edge}: Used = {var.varValue}")
-
+    value = 0
     for edge, var in edge_vars.items():
         if var.varValue == 1:
+            value += 1
             print(edge)
 
     # Retrieve the optimal objective value
-    print(f"\nOptimal Total Cost: {float(len(edges)) - pl.value(problem.objective)}")
+    print(f"\nOptimal Total Cost: {value}")
 
 print_sol()
 
