@@ -1,6 +1,8 @@
 import os
 import time
 from datetime import datetime
+import argparse
+
 class Graph:
     def __init__(self, hoehe, breite):
         self.breite = breite
@@ -42,12 +44,15 @@ class Graph:
             val += len(values)
         return val // 2
     
-    def get_adj_nodes(self, u):
+    def neighbors(self, u):
         return self.graph[u]
     
     def add_grube(self, x, y):
         vertex = y*self.breite + x
         self.gruben.add(vertex)
+
+    def delete_edges(self, u):
+        self.graph[u] = []
 class Queue:
     def __init__(self):
         self.queue = []
@@ -63,22 +68,9 @@ class Queue:
     
     def is_empty(self):
         return len(self.queue) == 0
-
-def graph_product(G1: Graph, G2: Graph, root: tuple, g1_gruben, g2_gruben) -> list[(int, int)]:
-    directions = ["U", "D", "L", "R"]
-    result = []
-    n1, n2 = root
-    for d in directions:
-        new_n1 = G1.edge_direction(n1, d)
-        new_n2 = G2.edge_direction(n2, d)
-        if new_n1 != n1 or new_n2 != n2:
-            if new_n1 in g1_gruben:
-                new_n1 = 0
-            if new_n2 in g2_gruben:
-                new_n2 = 0
-            result.append(((new_n1, new_n2), d))
-
-    return result
+    
+    def length(self):
+        return len(self.queue)
 
 def graphen_erstellen(filename) -> list[Graph, Graph, int, int]:
     start = time.time()
@@ -109,10 +101,46 @@ def graphen_erstellen(filename) -> list[Graph, Graph, int, int]:
 
 def graph_optimieren(G):
     pass
+    #first check feasibility (bfs on both graphs independently)
+
     # check for independent subgraphs
     # check for bridges to independent subgraphs  
 
-def bfs(G1: Graph, G2: Graph, source: int, destination: int) -> tuple[dict, float]:
+def graph_product(G1: Graph, G2: Graph, root: tuple, g1_gruben, g2_gruben) -> list[(int, int)]:
+    directions = ["U", "D", "L", "R"]
+    result = []
+    n1, n2 = root
+    for d in directions:
+        new_n1 = G1.edge_direction(n1, d)
+        new_n2 = G2.edge_direction(n2, d)
+        if new_n1 != n1 or new_n2 != n2:
+            if new_n1 in g1_gruben:
+                new_n1 = 0
+            if new_n2 in g2_gruben:
+                new_n2 = 0
+            result.append(((new_n1, new_n2), d))
+
+    return result
+
+def bfs_shortest_path(G1: Graph, destination: int) -> bool:
+    visited = set()
+    q = Queue()
+    q.push(0)
+    
+    while not q.is_empty():
+        vertex = q.pop()
+        for neighbor in G1.neighbors(vertex):
+            if neighbor in G1.gruben:
+                visited.add(neighbor)
+            else:
+                if neighbor == destination:
+                    return True
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    q.push(neighbor)
+    return False
+
+def unidirectional_bfs(G1: Graph, G2: Graph, source: int, destination: int) -> tuple[dict, float]:
     start = time.time()
     # Value DS: (n1, n2): Tuple
     visited = set()
@@ -122,6 +150,9 @@ def bfs(G1: Graph, G2: Graph, source: int, destination: int) -> tuple[dict, floa
 
     q.push(source)
     visited.add(source)
+
+    G1.delete_edges(destination[0])
+    G1.delete_edges(destination[0])
 
     while not q.is_empty():
         root_vertex = q.pop()
@@ -137,7 +168,75 @@ def bfs(G1: Graph, G2: Graph, source: int, destination: int) -> tuple[dict, floa
     end = time.time()
     return parent, end-start
 
-def get_command_sequence(parent: dict, destination: int) -> list:
+def bidirectional_bfs(G1: Graph, G2: Graph, source: int, destination: int) -> list[tuple[list, list], int, float]:
+    start = time.time()
+    q_start = Queue()
+    q_end = Queue()
+    visited_start = set()
+    visited_end = set()
+    parent_start = {}
+    parent_end = {}
+
+
+    q_start.push(source)
+    q_end.push(destination)
+
+    visited_start.add(source)
+    visited_end.add(destination)
+
+    break_condition = False
+
+    while not q_start.is_empty() and not q_end.is_empty():
+        if break_condition == True:
+            break
+        if q_start.length() < q_end.length():
+            root_vertex = q_start.pop()
+            for neighbor in graph_product(G1, G2, root_vertex, G1.gruben, G2.gruben):
+                if neighbor[0] not in visited_start:
+                    parent_start[neighbor[0]] = (root_vertex, neighbor[1])
+                    if neighbor[0] in visited_end:
+                        meeting_vertex = neighbor[0]
+                        break_condition = True
+                        break
+
+                    q_start.push(neighbor[0])
+                    visited_start.add(neighbor[0])
+        else:
+            root_vertex = q_end.pop()
+            for neighbor in graph_product(G1, G2, root_vertex, G1.gruben, G2.gruben):
+                if neighbor[0] not in visited_end:
+                    parent_end[neighbor[0]] = (root_vertex, neighbor[1])
+                    if neighbor[0] in visited_start:
+                        meeting_vertex = neighbor[0]
+                        break_condition = True
+                        break
+                    q_end.push(neighbor[0])
+                    visited_end.add(neighbor[0])
+
+    end = time.time()
+    return (parent_start, parent_end), meeting_vertex, end-start
+
+def bidirectional_sequence(parent_start: list, parent_end: list, meeting_vertex: int, destination: int) -> list:
+    path = []
+    directions = {
+        "U": "D",
+        "D": "U",
+        "L": "R",
+        "R": "L"
+    }
+    current_vertex = meeting_vertex
+    while current_vertex != (0,0):
+        path.append(parent_start[current_vertex][1])
+        current_vertex = parent_start[current_vertex][0]
+
+    current_vertex = meeting_vertex
+    while current_vertex != (destination, destination):
+        path.append(directions[parent_end[current_vertex][1]])
+        current_vertex = parent_end[current_vertex][0]
+    
+    return path
+
+def unidirectional_sequence(parent: dict, destination: int) -> list:
     if parent.get(destination) == None:
         return []
     else:
@@ -168,8 +267,8 @@ def print_path(path: list):
 
 def write_to_file(path, graph_time, bfs_time, data, folder_path):
     with open(folder_path + data, 'w') as f:
-        f.write("Runtime for creating the graphs: " + str(graph_time)[0:6] + " s\n")
-        f.write("Runtime for running BFS on product graph: " + str(bfs_time)[0:6] + " s\n\n")
+        f.write("Runtime for creating the graphs: " + str(graph_time)[0:8] + " s\n")
+        f.write("Runtime for running BFS on product graph: " + str(bfs_time)[0:8] + " s\n\n")
         if path != []:
             for index, p in enumerate(path, start=1):
                 if p == "U":
@@ -183,15 +282,69 @@ def write_to_file(path, graph_time, bfs_time, data, folder_path):
         else:
             f.write("No solution found...")
 
-if __name__ == "__main__":
-    current = os.getcwd() + "/auf2/output/"
-    folder_path = os.path.join(current, str(datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))) + "/"
-    os.makedirs(folder_path, exist_ok=True)
-    for _ in [0,1,2,3,7,4,8,5,9,6]:
+def run_presolving():
+    for _ in range(10):
+        current = os.getcwd() + "/auf2/output/presolving/"
         print(f"Working on file {_}")
         filename = f"./auf2/data/labyrinthe{_}.txt"
         g1, g2, hoehe, breite, graph_time = graphen_erstellen(filename)
-        parentlist, bfs_time = bfs(g1, g2, (0,0), (hoehe*breite-1, hoehe*breite-1))
-        path = get_command_sequence(parentlist, (hoehe*breite-1, hoehe*breite-1))
-        write_to_file(path, graph_time, bfs_time, "solution" + filename.split("/")[-1][-5] + ".txt", folder_path)
-        
+        dest = hoehe*breite-1
+        if bfs_shortest_path(g1, dest) and bfs_shortest_path(g2, dest):
+            with open(current + filename.split("/")[-1][-5] + ".txt", 'w') as f:
+                f.write("Solvable")
+        else:
+            with open(current + filename.split("/")[-1][-5] + ".txt", 'w') as f:
+                f.write("Impossible to complete. No continuous flow in one of the mazes.\nNo solution found.")
+
+def run_unidirectional_bfs():
+    current = os.getcwd() + "/auf2/output/"
+    folder_path = os.path.join(current, str(datetime.now().strftime("%m-%d_%H-%M_unidir"))) + "/"
+    os.makedirs(folder_path, exist_ok=True)
+    input_files = map(int,input("Welche Dateien sollen getestet werden? Nummern mit Leerzeichen trennen: ").split())
+    for _ in input_files:
+        print(f"Working on file {_}")
+        filename = f"./auf2/data/labyrinthe{_}.txt"
+        g1, g2, hoehe, breite, graph_time = graphen_erstellen(filename)
+        dest = hoehe*breite-1
+        if bfs_shortest_path(g1, dest) and bfs_shortest_path(g2, dest):
+            parentlist, bfs_time = unidirectional_bfs(g1, g2, (0,0), (dest,dest))
+            path = unidirectional_sequence(parentlist, (dest,dest))
+            write_to_file(path, graph_time, bfs_time, "solution" + filename.split("/")[-1][-5] + ".txt", folder_path)
+        else:
+            with open(folder_path + "solution" + filename.split("/")[-1][-5] + ".txt", 'w') as f:
+                f.write("Impossible to complete. No continuous flow in one of the mazes.\nNo solution found.")
+
+def run_bidirectional_bfs():
+    current = os.getcwd() + "/auf2/output/"
+    folder_path = os.path.join(current, str(datetime.now().strftime("%m-%d_%H-%M_bidir"))) + "/"
+    os.makedirs(folder_path, exist_ok=True)
+    input_files = map(int,input("Welche Dateien sollen getestet werden? Nummern mit Leerzeichen trennen: ").split())
+    for _ in input_files:
+        print(f"Working on file {_}")
+        filename = f"./auf2/data/labyrinthe{_}.txt"
+        g1, g2, hoehe, breite, graph_time = graphen_erstellen(filename)
+        dest = hoehe*breite-1
+        if bfs_shortest_path(g1, dest) and bfs_shortest_path(g2, dest):
+            parentlists, meeting_vertex, bfs_time = bidirectional_bfs(g1, g2, (0,0), (dest,dest))
+            path = bidirectional_sequence(parentlists[0], parentlists[1], meeting_vertex, dest) 
+
+            write_to_file(path, graph_time, bfs_time, "solution" + filename.split("/")[-1][-5] + ".txt", folder_path)
+        else:
+            with open(folder_path + "solution" + filename.split("/")[-1][-5] + ".txt", 'w') as f:
+                f.write("Impossible to complete. No continuous flow in one of the mazes.\nNo solution found.")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run BFS algorithms based on the provided flag.")
+    # Define the flag -u for unidirectional BFS
+    parser.add_argument('-u', '--unidirectional', action='store_true', help='Run unidirectional BFS')
+    # Define the flag -b for bidirectional BFS
+    parser.add_argument('-b', '--bidirectional', action='store_true', help='Run bidirectional BFS')
+    
+    args = parser.parse_args()
+
+    if args.unidirectional:
+        run_unidirectional_bfs()
+    elif args.bidirectional:
+        run_bidirectional_bfs()
+    else:
+        print("No valid flag provided. Use -u for unidirectional or -b for bidirectional BFS.")
