@@ -2,6 +2,7 @@ import os
 import time
 from datetime import datetime
 import argparse
+import heapq
 
 class Graph:
     def __init__(self, hoehe, breite):
@@ -72,6 +73,29 @@ class Queue:
     def length(self):
         return len(self.queue)
 
+class PrioQueue:
+    def __init__(self, height, width):
+        self.queue = []
+        self.height = height
+        self.width = width
+
+
+
+    def is_empty(self):
+        return len(self.queue) == 0
+
+    def length(self):
+        return len(self.queue)
+    #tuple mit state und max manhattan distance
+    def push(self, data: tuple[tuple, int]):
+        # Use (priority, state) structure for heapq
+        heapq.heappush(self.queue, data)
+
+    # Pop the element with the smallest priority (self.queue[i][1])
+    def pop(self):
+        # heapq.heappop() will return (priority, state), so we return only the state
+        return heapq.heappop(self.queue)[1]
+
 def graphen_erstellen(filename) -> list[Graph, Graph, int, int]:
     start = time.time()
     with open(filename, "r") as f:
@@ -99,7 +123,6 @@ def graphen_erstellen(filename) -> list[Graph, Graph, int, int]:
     end = time.time()
     return (G1, G2, hoehe, breite, end-start)
 
-def graph_optimieren(G):
     pass
     #first check feasibility (bfs on both graphs independently)
 
@@ -118,9 +141,21 @@ def graph_product(G1: Graph, G2: Graph, root: tuple, g1_gruben, g2_gruben) -> li
                 new_n1 = 0
             if new_n2 in g2_gruben:
                 new_n2 = 0
-            result.append(((new_n1, new_n2), d))
+            if not (new_n1 in g1_gruben and new_n2 in g2_gruben):
+                result.append(((new_n1, new_n2), d))
 
     return result
+
+def manhattan_distance(node, height, width) -> int:
+    x_n = node%width
+    y_n = node//height
+    return abs(x_n-width+1)+abs(y_n-height+1)
+
+def max_heuristic(node1, node2, height, width, source_cost) -> int:
+    return max(manhattan_distance(node1, height, width)+source_cost+1, manhattan_distance(node2, height, width)+source_cost+1)
+
+def sum_heuristic(node1, node2, height, width, source_cost) -> int:
+    return manhattan_distance(node1, height, width)+manhattan_distance(node2, height, width)+source_cost+1
 
 def bfs_shortest_path(G1: Graph, destination: int) -> bool:
     visited = set()
@@ -152,17 +187,16 @@ def unidirectional_bfs(G1: Graph, G2: Graph, source: int, destination: int) -> t
     visited.add(source)
 
     G1.delete_edges(destination[0])
-    G1.delete_edges(destination[0])
+    G2.delete_edges(destination[0])
 
     while not q.is_empty():
-        root_vertex = q.pop()
-
-        if root_vertex == destination:
+        current_vertex = q.pop()
+        if current_vertex == destination:
             break
 
-        for neighbor in graph_product(G1, G2, root_vertex, G1.gruben, G2.gruben):
+        for neighbor in graph_product(G1, G2, current_vertex, G1.gruben, G2.gruben):
             if neighbor[0] not in visited:
-                parent[neighbor[0]] = (root_vertex, neighbor[1])
+                parent[neighbor[0]] = (current_vertex, neighbor[1])
                 q.push(neighbor[0])
                 visited.add(neighbor[0])
     end = time.time()
@@ -216,6 +250,67 @@ def bidirectional_bfs(G1: Graph, G2: Graph, source: int, destination: int) -> li
     end = time.time()
     return (parent_start, parent_end), meeting_vertex, end-start
 
+def unidirectional_a_star(G1: Graph, G2: Graph, source: tuple, destination: tuple, height: int, width: int):
+    start = time.time()
+
+    q = PrioQueue(height, width)
+    q.push((manhattan_distance(0, height, width), source))
+
+    visited = set()
+    parent = {} 
+    cost = {}
+    cost[source] = 0
+    visited.add(source)
+
+    G1.delete_edges(destination[0])
+    G2.delete_edges(destination[0])
+    while not q.is_empty():
+        current_vertex = q.pop()
+        source_cost = cost[current_vertex]
+
+        if current_vertex == destination:
+            break
+
+        for neighbor in graph_product(G1, G2, current_vertex, G1.gruben, G2.gruben):
+            if neighbor[0] not in visited:
+                parent[neighbor[0]] = (current_vertex, neighbor[1])
+                cost[neighbor[0]] = source_cost + 1
+                q.push((max_heuristic(neighbor[0][0], neighbor[0][1], height, width, source_cost), neighbor[0]))
+                visited.add(neighbor[0])
+    end = time.time()
+    return parent, end-start
+
+def uni_a_star_sum(G1: Graph, G2: Graph, source: tuple, destination: tuple, height: int, width: int):
+    start = time.time()
+
+    q = PrioQueue(height, width)
+    q.push((sum_heuristic(0,0,height, width, 0), source))
+
+    visited = set()
+    parent = {} 
+    cost = {}
+    cost[source] = 0
+    visited.add(source)
+
+    G1.delete_edges(destination[0])
+    G2.delete_edges(destination[0])
+
+    while not q.is_empty():
+        current_vertex = q.pop()
+        source_cost = cost[current_vertex]
+
+        if current_vertex == destination:
+            break
+
+        for neighbor in graph_product(G1, G2, current_vertex, G1.gruben, G2.gruben):
+            if neighbor[0] not in visited:
+                parent[neighbor[0]] = (current_vertex, neighbor[1])
+                cost[neighbor[0]] = source_cost + 1
+                q.push((sum_heuristic(neighbor[0][0], neighbor[0][1], height, width, source_cost), neighbor[0]))
+                visited.add(neighbor[0])
+    end = time.time()
+    return parent, end-start
+
 def bidirectional_sequence(parent_start: list, parent_end: list, meeting_vertex: int, destination: int) -> list:
     path = []
     directions = {
@@ -225,15 +320,16 @@ def bidirectional_sequence(parent_start: list, parent_end: list, meeting_vertex:
         "R": "L"
     }
     current_vertex = meeting_vertex
-    while current_vertex != (0,0):
-        path.append(parent_start[current_vertex][1])
-        current_vertex = parent_start[current_vertex][0]
-
-    current_vertex = meeting_vertex
     while current_vertex != (destination, destination):
         path.append(directions[parent_end[current_vertex][1]])
         current_vertex = parent_end[current_vertex][0]
-    
+    path = path[::-1]
+    current_vertex = meeting_vertex
+    while current_vertex != (0,0):
+        path.append(parent_start[current_vertex][1])
+        current_vertex = parent_start[current_vertex][0]
+    path = path[::-1]
+
     return path
 
 def unidirectional_sequence(parent: dict, destination: int) -> list:
@@ -246,8 +342,6 @@ def unidirectional_sequence(parent: dict, destination: int) -> list:
             path.append(parent[current_vertex][1])
             current_vertex = parent[current_vertex][0]
         
-
-
         return path[::-1]
     
 def print_path(path: list):
@@ -327,7 +421,42 @@ def run_bidirectional_bfs():
         if bfs_shortest_path(g1, dest) and bfs_shortest_path(g2, dest):
             parentlists, meeting_vertex, bfs_time = bidirectional_bfs(g1, g2, (0,0), (dest,dest))
             path = bidirectional_sequence(parentlists[0], parentlists[1], meeting_vertex, dest) 
+            write_to_file(path, graph_time, bfs_time, "solution" + filename.split("/")[-1][-5] + ".txt", folder_path)
+        else:
+            with open(folder_path + "solution" + filename.split("/")[-1][-5] + ".txt", 'w') as f:
+                f.write("Impossible to complete. No continuous flow in one of the mazes.\nNo solution found.")
 
+def run_astar():
+    current = os.getcwd() + "/auf2/output/"
+    folder_path = os.path.join(current, str(datetime.now().strftime("%m-%d_%H-%M_astar"))) + "/"
+    os.makedirs(folder_path, exist_ok=True)
+    input_files = map(int,input("Welche Dateien sollen getestet werden? Nummern mit Leerzeichen trennen: ").split())
+    for _ in input_files:
+        print(f"Working on file {_}")
+        filename = f"./auf2/data/labyrinthe{_}.txt"
+        g1, g2, hoehe, breite, graph_time = graphen_erstellen(filename)
+        dest = hoehe*breite-1
+        if bfs_shortest_path(g1, dest) and bfs_shortest_path(g2, dest):
+            parentlists, bfs_time = unidirectional_a_star(g1, g2, (0,0), (dest,dest), breite, hoehe)
+            path = unidirectional_sequence(parentlists, (dest,dest)) 
+            write_to_file(path, graph_time, bfs_time, "solution" + filename.split("/")[-1][-5] + ".txt", folder_path)
+        else:
+            with open(folder_path + "solution" + filename.split("/")[-1][-5] + ".txt", 'w') as f:
+                f.write("Impossible to complete. No continuous flow in one of the mazes.\nNo solution found.")
+
+def run_astar_sum():
+    current = os.getcwd() + "/auf2/output/"
+    folder_path = os.path.join(current, str(datetime.now().strftime("%m-%d_%H-%M_astar"))) + "/"
+    os.makedirs(folder_path, exist_ok=True)
+    input_files = map(int,input("Welche Dateien sollen getestet werden? Nummern mit Leerzeichen trennen: ").split())
+    for _ in input_files:
+        print(f"Working on file {_}")
+        filename = f"./auf2/data/labyrinthe{_}.txt"
+        g1, g2, hoehe, breite, graph_time = graphen_erstellen(filename)
+        dest = hoehe*breite-1
+        if bfs_shortest_path(g1, dest) and bfs_shortest_path(g2, dest):
+            parentlists, bfs_time = uni_a_star_sum(g1, g2, (0,0), (dest,dest), breite, hoehe)
+            path = unidirectional_sequence(parentlists, (dest,dest)) 
             write_to_file(path, graph_time, bfs_time, "solution" + filename.split("/")[-1][-5] + ".txt", folder_path)
         else:
             with open(folder_path + "solution" + filename.split("/")[-1][-5] + ".txt", 'w') as f:
@@ -339,6 +468,10 @@ if __name__ == "__main__":
     parser.add_argument('-u', '--unidirectional', action='store_true', help='Run unidirectional BFS')
     # Define the flag -b for bidirectional BFS
     parser.add_argument('-b', '--bidirectional', action='store_true', help='Run bidirectional BFS')
+
+    parser.add_argument('-a', '--astar', action='store_true', help='Run A-Star Algorithm')
+
+    parser.add_argument('-s', '--astar_sum', action='store_true', help='Run A-Star Algorithm with Sum Heuristic')
     
     args = parser.parse_args()
 
@@ -346,5 +479,9 @@ if __name__ == "__main__":
         run_unidirectional_bfs()
     elif args.bidirectional:
         run_bidirectional_bfs()
+    elif args.astar:
+        run_astar()
+    elif args.astar_sum:
+        run_astar_sum()
     else:
-        print("No valid flag provided. Use -u for unidirectional or -b for bidirectional BFS.")
+        print("No valid flag provided. Use -u, -b, -a, -s to run the respective algorithms.")
