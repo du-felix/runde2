@@ -20,7 +20,7 @@ class Graph {
         vector<vector<int>> adjacency_list;
         unordered_set<int> gruben;
 
-        Graph(int heohe, int breite): breite(breite), hoehe(hoehe) {
+        Graph(int hoehe, int breite): breite(breite), hoehe(hoehe) {
             V = breite * hoehe;
             adjacency_list.resize(V);
         }
@@ -84,13 +84,41 @@ Graph create_graph(string filename) {
     for (size_t i = 0; i < hoehe; i++) {
         string line;
         getline(file, line);
+        istringstream iss(line);
+
+        size_t j = 0;
+        int value;
+        while (iss >> value) {
+            if(value == 0) {
+                G.add_edge(i * breite + j, i * breite + j + 1);
+                j++;
+            }
+        }
     }
+
     for (size_t i = 0; i < hoehe-1; i++) {
         string line;
         getline(file, line);
+        istringstream iss(line);
+
+        size_t j = 0;
+        int value;
+        while (iss >> value) {
+            if (value == 0) {
+                G.add_edge(i * breite + j, (i + 1) * breite + j);
+                j++;
+            }
+        }
     }
 
-
+    int range;
+    file >> range;
+    for (size_t i = 0; i < range; i++) {
+        int x, y;
+        file >> x >> y;
+        G.add_grube(x, y);
+    }
+    return G;
 }
 
 vector<tuple<pair<int, int>, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vertex, unordered_set<int> g1_gruben, unordered_set<int> g2_gruben) {
@@ -113,6 +141,7 @@ vector<tuple<pair<int, int>, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, i
             neighbors.push_back(make_tuple(make_pair(new_n1, new_n2), d));
         }
     }
+    return neighbors;
 }
 
 bool bfs_sp(Graph &G, int dest) {
@@ -137,12 +166,12 @@ bool bfs_sp(Graph &G, int dest) {
     return false;
 }
 
-tuple<map<tuple<int, int>, tuple<tuple<int, int>, char>>, float> uni_bfs(Graph &G1, Graph &G2, tuple<int, int> source, tuple<int, int> dest, int height, int width) {
+tuple<map<pair<int, int>, tuple<pair<int, int>, char>>, float> uni_bfs(Graph &G1, Graph &G2, pair<int, int> source, pair<int, int> dest, int height, int width) {
     auto start = chrono::high_resolution_clock::now();
 
-    queue<tuple<int, int>> q;
-    unordered_set<tuple<int, int>> visited;
-    map<tuple<int, int>, tuple<tuple<int, int>, char>> parent;
+    queue<pair<int, int>> q;
+    unordered_set<pair<int, int>> visited;
+    map<pair<int, int>, tuple<pair<int, int>, char>> parent;
 
     q.push(source);
     visited.insert(source);
@@ -151,7 +180,7 @@ tuple<map<tuple<int, int>, tuple<tuple<int, int>, char>>, float> uni_bfs(Graph &
     G2.delete_neighbors(get<0>(dest));
 
     while (!q.empty()) {
-        auto vertex = q.front();
+        pair<int, int> vertex = q.front();
         q.pop();
         if (vertex == dest) {
             break;
@@ -163,16 +192,46 @@ tuple<map<tuple<int, int>, tuple<tuple<int, int>, char>>, float> uni_bfs(Graph &
                 parent[get<0>(neighbor)] = make_tuple(vertex, get<1>(neighbor));
             }
         }
+    }
     auto end = chrono::high_resolution_clock::now();
     float time = chrono::duration_cast<chrono::milliseconds>(end - start).count();
     return make_tuple(parent, time);
-    }
-    
+}
 
-    auto end = chrono::high_resolution_clock::now();
+vector<char> uni_get_seq(map<pair<int, int>, tuple<pair<int, int>, char>> &parent, pair<int, int> dest) {
+    vector<char> seq;
+    pair<int, int> vertex = dest;
+    while (vertex != make_pair(0, 0)) {
+        seq.push_back(get<1>(parent[vertex]));
+        vertex = get<0>(parent[vertex]);
+    }
+    reverse(seq.begin(), seq.end());
+    return seq;
+}
+
+void print_path(vector<char> &seq) {
+    for (size_t i = 0; i < seq.size(); ++i) {
+        std::cout << i << ": " << seq[i] << ";" << endl;
+    }
+    std::cout << std::endl;
 }
 
 int main(int argc, char const *argv[]) {
+    string filebase = "/auf2/data/labyrinthe";
+    for (size_t i = 0; i < 10; i++) {
+        string filename = filebase + to_string(i) + ".txt";
+        Graph G1 = create_graph(filename);
+        Graph G2 = create_graph(filename);
+    
+        if (bfs_sp(G1, G1.V - 1) && bfs_sp(G2, G2.V - 1)) {
 
+            auto res = uni_bfs(G1, G2, make_pair(0, 0), make_pair(G1.V - 1, G2.V - 1), G1.hoehe, G1.breite);
+            cout << "Time: " << get<1>(res) << "ms" << endl;
+            vector<char> seq = uni_get_seq(get<0>(res), make_pair(G1.V - 1, G2.V - 1));
+            print_path(seq);
+        } else {
+            cout << "No path exists" << endl;
+        }   
+    }
     return 0;
 }

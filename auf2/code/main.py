@@ -151,6 +151,13 @@ def manhattan_distance(node, height, width) -> int:
     y_n = node//height
     return abs(x_n-width+1)+abs(y_n-height+1)
 
+def comb_man_dist(node: tuple, height, width) -> int:
+    x1 = node[0]%width
+    y1 = node[0]//height
+    x2 = node[1]%width
+    y2 = node[1]//height
+    return max(x1,x2)+max(y1,y2)
+
 def max_heuristic(node1, node2, height, width, source_cost) -> int:
     return max(manhattan_distance(node1, height, width)+source_cost+1, manhattan_distance(node2, height, width)+source_cost+1)
 
@@ -276,6 +283,36 @@ def unidirectional_a_star(G1: Graph, G2: Graph, source: tuple, destination: tupl
                 parent[neighbor[0]] = (current_vertex, neighbor[1])
                 cost[neighbor[0]] = source_cost + 1
                 q.push((max_heuristic(neighbor[0][0], neighbor[0][1], height, width, source_cost), neighbor[0]))
+                visited.add(neighbor[0])
+    end = time.time()
+    return parent, end-start
+
+def uni_a_star_comb(G1: Graph, G2: Graph, source: tuple, destination: tuple, height: int, width: int):
+    start = time.time()
+
+    q = PrioQueue(height, width)
+    q.push((manhattan_distance(0, height, width), source))
+
+    visited = set()
+    parent = {} 
+    cost = {}
+    cost[source] = 0
+    visited.add(source)
+
+    G1.delete_edges(destination[0])
+    G2.delete_edges(destination[0])
+    while not q.is_empty():
+        current_vertex = q.pop()
+        source_cost = cost[current_vertex]
+
+        if current_vertex == destination:
+            break
+
+        for neighbor in graph_product(G1, G2, current_vertex, G1.gruben, G2.gruben):
+            if neighbor[0] not in visited:
+                parent[neighbor[0]] = (current_vertex, neighbor[1])
+                cost[neighbor[0]] = source_cost + 1
+                q.push((comb_man_dist(neighbor[0], height, width), neighbor[0]))
                 visited.add(neighbor[0])
     end = time.time()
     return parent, end-start
@@ -444,6 +481,24 @@ def run_astar():
             with open(folder_path + "solution" + filename.split("/")[-1][-5] + ".txt", 'w') as f:
                 f.write("Impossible to complete. No continuous flow in one of the mazes.\nNo solution found.")
 
+def run_astar_comb():
+    current = os.getcwd() + "/auf2/output/"
+    folder_path = os.path.join(current, str(datetime.now().strftime("%m-%d_%H-%M_astar"))) + "/"
+    os.makedirs(folder_path, exist_ok=True)
+    input_files = map(int,input("Welche Dateien sollen getestet werden? Nummern mit Leerzeichen trennen: ").split())
+    for _ in input_files:
+        print(f"Working on file {_}")
+        filename = f"./auf2/data/labyrinthe{_}.txt"
+        g1, g2, hoehe, breite, graph_time = graphen_erstellen(filename)
+        dest = hoehe*breite-1
+        if bfs_shortest_path(g1, dest) and bfs_shortest_path(g2, dest):
+            parentlists, bfs_time = uni_a_star_comb(g1, g2, (0,0), (dest,dest), breite, hoehe)
+            path = unidirectional_sequence(parentlists, (dest,dest)) 
+            write_to_file(path, graph_time, bfs_time, "solution" + filename.split("/")[-1][-5] + ".txt", folder_path)
+        else:
+            with open(folder_path + "solution" + filename.split("/")[-1][-5] + ".txt", 'w') as f:
+                f.write("Impossible to complete. No continuous flow in one of the mazes.\nNo solution found.")
+
 def run_astar_sum():
     current = os.getcwd() + "/auf2/output/"
     folder_path = os.path.join(current, str(datetime.now().strftime("%m-%d_%H-%M_astar"))) + "/"
@@ -473,6 +528,8 @@ if __name__ == "__main__":
 
     parser.add_argument('-s', '--astar_sum', action='store_true', help='Run A-Star Algorithm with Sum Heuristic')
     
+    parser.add_argument('-c', '--astar_comb', action='store_true', help='Run A-Star Algorithm with Sum Heuristic')
+    
     args = parser.parse_args()
 
     if args.unidirectional:
@@ -483,5 +540,7 @@ if __name__ == "__main__":
         run_astar()
     elif args.astar_sum:
         run_astar_sum()
+    elif args.astar_comb:
+        run_astar_comb()
     else:
         print("No valid flag provided. Use -u, -b, -a, -s to run the respective algorithms.")

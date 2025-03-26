@@ -1,0 +1,2 @@
+combined heuristics:
+max(x1, x2) + max()
