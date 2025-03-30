@@ -1,19 +1,6 @@
 {
     "version": "0.2.0",
     "configurations": [
-        {
-            "type": "sldb",
-            "request": "launch",
-            "name": "(sdlb) Launch",
-            "program": "${workspaceFolder}/uni_bfs"
-        },
-        {
-            "type": "by-gdb",
-            "request": "launch",
-            "name": "Launch(gdb)",
-            "program": "${fileBasenameNoExtension}",
-            "cwd": "${workspaceRoot}"
-        },
         {       
             "name": "Launch with LLDB",
             "type": "lldb",

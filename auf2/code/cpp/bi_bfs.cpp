@@ -12,7 +12,8 @@
 #include <algorithm>
 
 using namespace std;
-
+using CoPair = pair<int, int>;
+using ParentMap =map<CoPair, tuple<CoPair, char>>;
 class Graph {
     public:
         int breite;
@@ -173,7 +174,7 @@ pair<Graph, Graph> create_graph(string filename) {
     return make_pair(G1, G2);
 }
 
-vector<tuple<pair<int, int>, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vertex, unordered_set<int> g1_gruben, unordered_set<int> g2_gruben) {
+vector<tuple<CoPair, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vertex, unordered_set<int> g1_gruben, unordered_set<int> g2_gruben) {
     array<char, 4> directions = {'U', 'D', 'L', 'R'};
     vector<tuple<pair<int, int>, char>> neighbors;
     int n1, n2;
@@ -220,7 +221,7 @@ bool bfs_sp(Graph &G, int dest) {
     return false;
 }
 
-tuple<pair<map<pair<int, int>, tuple<pair<int, int>, char>>, map<pair<int, int>, tuple<pair<int, int>, char>>>, pair<int, int>, float> bi_bfs(Graph &G1, Graph &G2, pair<int, int> source, pair<int, int> dest, int height, int width) {
+tuple<pair<ParentMap, ParentMap>, CoPair, float> bi_bfs(Graph &G1, Graph &G2, CoPair source, CoPair dest, int height, int width) {
     auto start = chrono::high_resolution_clock::now();
 
     queue<pair<int, int>> qs, qd;
@@ -276,15 +277,29 @@ tuple<pair<map<pair<int, int>, tuple<pair<int, int>, char>>, map<pair<int, int>,
     return make_tuple(make_pair(parents, parentd), meeting_vertex, time);
 }
 
-vector<char> uni_get_seq(map<pair<int, int>, tuple<pair<int, int>, char>> &parent, pair<int, int> dest) {
-    vector<char> seq;
-    pair<int, int> vertex = dest;
-    while (vertex != make_pair(0, 0)) {
-        seq.push_back(get<1>(parent[vertex]));
-        vertex = get<0>(parent[vertex]);
+vector<char> bi_seq(ParentMap &parents, ParentMap &parentd, CoPair meeting_vertex, CoPair dest) {
+    vector<char> seq_s;
+    vector<char> seq_d;
+    map<char, char> reverse_dir = {
+        {'U', 'D'},
+        {'D', 'U'},
+        {'L', 'R'},
+        {'R', 'L'}
+    };
+    CoPair source = make_pair(0,0);
+    CoPair vertex = meeting_vertex;
+    while (vertex != source) {
+        seq_s.push_back(get<1>(parents[vertex]));
+        vertex = get<0>(parents[vertex]);
     }
-    reverse(seq.begin(), seq.end());
-    return seq;
+    reverse(seq_s.begin(), seq_s.end());
+    vertex = meeting_vertex;
+    while (vertex != dest) {
+        seq_d.push_back(reverse_dir[get<1>(parentd[vertex])]);
+        vertex = get<0>(parentd[vertex]);
+    }
+    seq_s.insert(seq_s.end(), seq_d.begin(), seq_d.end());
+    return seq_s;
 }
 
 void print_path(vector<char> &seq) {
@@ -294,11 +309,24 @@ void print_path(vector<char> &seq) {
     std::cout << std::endl;
 }
 
+void path_to_file(vector<char> &seq) {
+    
+}
+
 int main(int argc, char const *argv[]) {
     string filebase = "auf2/data/labyrinthe";
     for (size_t i = 0; i < 5; i++) {
         string filename = filebase + to_string(i) + ".txt";
         auto [G1, G2] = create_graph(filename);
+        if (bfs_sp(G1, G1.V - 1) && bfs_sp(G2, G2.V - 1)) {
+            CoPair source = make_pair(0, 0);
+            CoPair dest = make_pair(G1.V - 1, G2.V - 1);
+            auto [parents, meeting_vertex, time] = bi_bfs(G1, G2, source, dest, G1.hoehe, G1.breite);
+            auto seq = bi_seq(get<0>(parents), get<1>(parents), meeting_vertex, dest);
+            print_path(seq);
+            cerr << "Path length: " << seq.size() << endl;
+            cout << "Time: " << time << "ms" << endl;
+        }
     }
     return 0;
 }
