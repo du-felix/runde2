@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <queue>
 #include <tuple>
+#include <set>
 #include <map>
 #include <chrono>
 #include <utility>
@@ -40,7 +41,6 @@ class Graph {
 
         int edge_dir(int u, char direction) {
             if (direction == 'U' && is_neighbor(u, u - breite)) {
-
                 return u - breite;
             } else if (direction == 'D' && is_neighbor(u, u + breite)) {
                 return u + breite;
@@ -60,15 +60,25 @@ class Graph {
         void delete_neighbors(int u) {
             adjacency_list[u].clear();
             adjacency_list[u].shrink_to_fit();
+        }   
+
+        void print_graph() {
+            for (size_t i = 0; i < V; i++) {
+                cout << i << ": ";
+                for (auto neighbor: adjacency_list[i]) {
+                    cout << neighbor << " ";
+                }
+                cout << endl;
+            }
         }
-        
 };
 
-Graph create_graph(string filename) {
+pair<Graph, Graph> create_graph(string filename) {
     ifstream file(filename);
 
     if (!file) {
         cerr << "File can't be opened" << endl;
+        cerr << "Filename: " << filename << endl;
         exit(1);
     }
     
@@ -78,8 +88,49 @@ Graph create_graph(string filename) {
         istringstream iss(dimensions_line);
         iss >> breite >> hoehe;
     }
-    Graph G(hoehe, breite);
+    Graph G1(hoehe, breite);
+    Graph G2(hoehe, breite);
 
+    // Alle horizontalen Kanten
+    for (size_t i = 0; i < hoehe; i++) {
+        string line;
+        getline(file, line);
+        istringstream iss(line);
+
+        size_t j = 0;
+        int value;
+        while (iss >> value) {
+            if(value == 0) {
+                G1.add_edge((i * breite + j), (i * breite + j + 1));
+            };
+            j++;
+        }
+    }
+
+    // Alle vertikalen Kanten
+    for (size_t i = 0; i < (hoehe-1); i++) {
+        string line;
+        getline(file, line);
+        istringstream iss(line);
+
+        size_t j = 0;
+        int value;
+        while (iss >> value) {
+            if (value == 0) {
+                G1.add_edge((i * breite + j), ((i + 1) * breite + j));
+            };
+            j++;
+        }
+    }
+
+    int range;
+    file >> range;
+    for (size_t i = 0; i < range; i++) {
+        int x, y;
+        file >> x >> y;
+        G1.add_grube(x, y);
+    }
+    file.ignore(numeric_limits<streamsize>::max(), '\n');
 
     for (size_t i = 0; i < hoehe; i++) {
         string line;
@@ -90,13 +141,13 @@ Graph create_graph(string filename) {
         int value;
         while (iss >> value) {
             if(value == 0) {
-                G.add_edge(i * breite + j, i * breite + j + 1);
-                j++;
-            }
+                G2.add_edge(i * breite + j, i * breite + j + 1);
+            };
+            j++;
         }
     }
 
-    for (size_t i = 0; i < hoehe-1; i++) {
+    for (size_t i = 0; i < (hoehe-1); i++) {
         string line;
         getline(file, line);
         istringstream iss(line);
@@ -105,20 +156,21 @@ Graph create_graph(string filename) {
         int value;
         while (iss >> value) {
             if (value == 0) {
-                G.add_edge(i * breite + j, (i + 1) * breite + j);
-                j++;
-            }
+                G2.add_edge(i * breite + j, (i + 1) * breite + j);
+            };
+            j++;
         }
     }
 
-    int range;
     file >> range;
     for (size_t i = 0; i < range; i++) {
         int x, y;
         file >> x >> y;
-        G.add_grube(x, y);
+        G2.add_grube(x, y);
     }
-    return G;
+
+    file.close();
+    return make_pair(G1, G2);
 }
 
 vector<tuple<pair<int, int>, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vertex, unordered_set<int> g1_gruben, unordered_set<int> g2_gruben) {
@@ -133,12 +185,14 @@ vector<tuple<pair<int, int>, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, i
             if (g1_gruben.find(new_n1) != g1_gruben.end()) {
                 new_n1 = 0;
             }
-            if (g1_gruben.find(new_n2) != g2_gruben.end()) {
+            if (g2_gruben.find(new_n2) != g2_gruben.end()) {
                 new_n2 = 0;
             }
-        }
-        if (g1_gruben.find(new_n1) == g1_gruben.end() && g2_gruben.find(new_n2) == g2_gruben.end()) {
-            neighbors.push_back(make_tuple(make_pair(new_n1, new_n2), d));
+            if (g1_gruben.find(new_n1) != g1_gruben.end() && g2_gruben.find(new_n2) != g2_gruben.end()) {
+                continue;
+            } else {
+                neighbors.push_back(make_tuple(make_pair(new_n1, new_n2), d));
+            }
         }
     }
     return neighbors;
@@ -170,7 +224,7 @@ tuple<map<pair<int, int>, tuple<pair<int, int>, char>>, float> uni_bfs(Graph &G1
     auto start = chrono::high_resolution_clock::now();
 
     queue<pair<int, int>> q;
-    unordered_set<pair<int, int>> visited;
+    set<pair<int, int>> visited;
     map<pair<int, int>, tuple<pair<int, int>, char>> parent;
 
     q.push(source);
@@ -210,18 +264,17 @@ vector<char> uni_get_seq(map<pair<int, int>, tuple<pair<int, int>, char>> &paren
 }
 
 void print_path(vector<char> &seq) {
-    for (size_t i = 0; i < seq.size(); ++i) {
-        std::cout << i << ": " << seq[i] << ";" << endl;
+    for (size_t i = 1; i < seq.size()+1; i++) {
+        std::cout << i << ": " << seq[i-1] << ";" << endl;
     }
     std::cout << std::endl;
 }
 
 int main(int argc, char const *argv[]) {
-    string filebase = "/auf2/data/labyrinthe";
-    for (size_t i = 0; i < 10; i++) {
+    string filebase = "auf2/data/labyrinthe";
+    for (size_t i = 0; i < 5; i++) {
         string filename = filebase + to_string(i) + ".txt";
-        Graph G1 = create_graph(filename);
-        Graph G2 = create_graph(filename);
+        auto [G1, G2] = create_graph(filename);
     
         if (bfs_sp(G1, G1.V - 1) && bfs_sp(G2, G2.V - 1)) {
 

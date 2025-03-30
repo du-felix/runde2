@@ -1,0 +1,49 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "sldb",
+            "request": "launch",
+            "name": "(sdlb) Launch",
+            "program": "${workspaceFolder}/uni_bfs"
+        },
+        {
+            "type": "by-gdb",
+            "request": "launch",
+            "name": "Launch(gdb)",
+            "program": "${fileBasenameNoExtension}",
+            "cwd": "${workspaceRoot}"
+        },
+        {       
+            "name": "Launch with LLDB",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/uni_bfs",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "preLaunchTask": "build"
+        },
+        
+        {
+            "name": "Debug uni_bfs",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/Users/felixdu/informatik/bwinf24/runde2/auf2/code/uni_bfs",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "/Users/felixdu/informatik/bwinf24/runde2/auf2/code",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "build",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "settings set target.pretty-printing true",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}

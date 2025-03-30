@@ -209,7 +209,7 @@ def unidirectional_bfs(G1: Graph, G2: Graph, source: int, destination: int) -> t
     end = time.time()
     return parent, end-start
 
-def bidirectional_bfs(G1: Graph, G2: Graph, source: int, destination: int) -> list[tuple[list, list], int, float]:
+def bidirectional_bfs(G1: Graph, G2: Graph, source: int, destination: int) -> list[tuple[list, list], tuple, float]:
     start = time.time()
     q_start = Queue()
     q_end = Queue()
