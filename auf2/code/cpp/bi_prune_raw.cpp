@@ -185,18 +185,12 @@ pair<Graph, Graph> create_graph(string filename) {
 
 // Let states enter dead end paths but dont generate new States in dead end paths
 void prune_graph(Graph &G) {
-    vector<CoPair> pruned_vertices;
     for (size_t i = 0; i < G.V; i++) {
-        if (G.get_neighbors(i).size() == 1 && i != 0 && i != G.V - 1 && G.gruben.find(i) == G.gruben.end()) {
+        if (G.get_neighbors(i).size() == 1 && i != 0 && i != G.V - 1) {
             auto neighbor = G.get_neighbors(i)[0];
-            G.flags[i] = true;
             G.delete_edge(i, neighbor);
-            pruned_vertices.push_back(make_pair(i, neighbor));
             i = -1;
         }
-    }
-    for (auto vertex: pruned_vertices) {
-        G.add_edge(get<0>(vertex), get<1>(vertex));
     }
 }
 
@@ -208,16 +202,14 @@ vector<tuple<CoPair, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vert
     for (auto d: directions) {
         int new_n1 = G1.edge_dir(n1, d);
         int new_n2 = G2.edge_dir(n2, d);
-        
-        
-        if (n1 != new_n1 && !G1.flags[new_n1] || n2 != new_n2 && !G2.flags[new_n2]) {
+        if (n1 != new_n1 || n2 != new_n2) {
             if (g1_gruben.find(new_n1) != g1_gruben.end()) {
                 new_n1 = 0;
             }
             if (g2_gruben.find(new_n2) != g2_gruben.end()) {
                 new_n2 = 0;
             }
-            if (new_n1 == 0 && new_n2 == 0) {
+            if (make_pair(new_n1, new_n2) == make_pair(0, 0)) {
                 continue;
             } else {
                 neighbors.push_back(make_tuple(make_pair(new_n1, new_n2), d));
@@ -353,9 +345,8 @@ int main(int argc, char const *argv[]) {
             prune_graph(G2);
             auto [parents, meeting_vertex, time] = bi_bfs(G1, G2, source, dest, G1.hoehe, G1.breite);
             auto seq = bi_seq(get<0>(parents), get<1>(parents), meeting_vertex, dest);
-            // print_path(seq);
-            cout << "File Number: " << i << endl;
-            cout << "Path length: " << seq.size() << endl;
+            print_path(seq);
+            cerr << "Path length: " << seq.size() << endl;
             cout << "Time: " << time << "ms" << endl;
         }
     }
