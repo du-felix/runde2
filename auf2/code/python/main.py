@@ -312,7 +312,7 @@ def uni_a_star_comb(G1: Graph, G2: Graph, source: tuple, destination: tuple, hei
             if neighbor[0] not in visited:
                 parent[neighbor[0]] = (current_vertex, neighbor[1])
                 cost[neighbor[0]] = source_cost + 1
-                q.push((comb_man_dist(neighbor[0], height, width), neighbor[0]))
+                q.push((comb_man_dist(neighbor[0], height, width)+source_cost + 1, neighbor[0]))
                 visited.add(neighbor[0])
     end = time.time()
     return parent, end-start

@@ -200,7 +200,7 @@ void prune_graph(Graph &G) {
     }
 }
 
-vector<tuple<CoPair, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vertex, unordered_set<int> g1_gruben, unordered_set<int> g2_gruben) {
+vector<tuple<CoPair, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vertex, unordered_set<int> g1_gruben, unordered_set<int> g2_gruben, bool back_traversing) {
     array<char, 4> directions = {'U', 'D', 'L', 'R'};
     vector<tuple<pair<int, int>, char>> neighbors;
     int n1, n2;
@@ -209,8 +209,11 @@ vector<tuple<CoPair, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vert
         int new_n1 = G1.edge_dir(n1, d);
         int new_n2 = G2.edge_dir(n2, d);
         
-        
-        if (n1 != new_n1 && !G1.flags[new_n1] || n2 != new_n2 && !G2.flags[new_n2]) {
+        if (back_traversing == true) {
+            if (n1 != new_n1 && !G1.flags[new_n1] || n2 != new_n2 && !G2.flags[new_n2] && (g1_gruben.find(new_n1) == g1_gruben.end() && g2_gruben.find(new_n2) == g2_gruben.end())) {
+                    neighbors.push_back(make_tuple(make_pair(new_n1, new_n2), d));
+                }           
+        } else if (n1 != new_n1 && !G1.flags[new_n1] || n2 != new_n2 && !G2.flags[new_n2]) {
             if (g1_gruben.find(new_n1) != g1_gruben.end()) {
                 new_n1 = 0;
             }
@@ -262,6 +265,8 @@ tuple<pair<ParentMap, ParentMap>, CoPair, float> bi_bfs(Graph &G1, Graph &G2, Co
     qd.push(dest);
     visiteds.insert(source);
     visitedd.insert(dest);
+    //G1.delete_neighbors(get<0>(dest));
+    //G2.delete_neighbors(get<0>(dest));
 
     while (!qs.empty() && !qd.empty()) {
         if (break_flag) {
@@ -270,7 +275,7 @@ tuple<pair<ParentMap, ParentMap>, CoPair, float> bi_bfs(Graph &G1, Graph &G2, Co
         if (qs.size() < qd.size()) {
             pair<int, int> vertex = qs.front();
             qs.pop();
-            for (auto neighbor: cart_prod(G1, G2, vertex, G1.gruben, G2.gruben)) {
+            for (auto neighbor: cart_prod(G1, G2, vertex, G1.gruben, G2.gruben, false)) {
                 if (visiteds.find(get<0>(neighbor)) == visiteds.end()) {
                     visiteds.insert(get<0>(neighbor));
                     qs.push(get<0>(neighbor));
@@ -285,7 +290,7 @@ tuple<pair<ParentMap, ParentMap>, CoPair, float> bi_bfs(Graph &G1, Graph &G2, Co
         } else {
             pair<int, int> vertex = qd.front();
             qd.pop();
-            for (auto neighbor: cart_prod(G1, G2, vertex, G1.gruben, G2.gruben)) {
+            for (auto neighbor: cart_prod(G1, G2, vertex, G1.gruben, G2.gruben, true)) {
                 if (visitedd.find(get<0>(neighbor)) == visitedd.end()) {
                     visitedd.insert(get<0>(neighbor));
                     qd.push(get<0>(neighbor));
@@ -343,7 +348,7 @@ void path_to_file(vector<char> &seq) {
 
 int main(int argc, char const *argv[]) {
     string filebase = "auf2/data/labyrinthe";
-    for (size_t i = 0; i < 4; i++) {
+    for (size_t i = 0; i < 5; i++) {
         string filename = filebase + to_string(i) + ".txt";
         auto [G1, G2] = create_graph(filename);
         if (bfs_sp(G1, G1.V - 1) && bfs_sp(G2, G2.V - 1)) {
@@ -353,10 +358,14 @@ int main(int argc, char const *argv[]) {
             prune_graph(G2);
             auto [parents, meeting_vertex, time] = bi_bfs(G1, G2, source, dest, G1.hoehe, G1.breite);
             auto seq = bi_seq(get<0>(parents), get<1>(parents), meeting_vertex, dest);
+            cerr << "passed" << endl;
             // print_path(seq);
             cout << "File Number: " << i << endl;
             cout << "Path length: " << seq.size() << endl;
-            cout << "Time: " << time << "ms" << endl;
+            cout << "Time: " << time << "ms" << endl << endl;
+        } else {
+            cout << "File Number: " << i << endl;
+            cout << "No path found" << endl << endl;
         }
     }
     return 0;

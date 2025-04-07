@@ -15,6 +15,17 @@
 using namespace std;
 using CoPair = pair<int, int>;
 using ParentMap =map<CoPair, tuple<CoPair, char>>;
+using PqEl = tuple<int, pair<int, int>>;
+
+// Custom comparator for the priority queue.
+// It returns true if the first element of a is greater than the first element of b.
+// This makes the smallest element (in terms of the comparator value) have the highest priority.
+struct Comparator {
+    bool operator()(const PqEl& a, const PqEl& b) const {
+        return get<0>(a) > get<0>(b);
+    }
+};
+
 class Graph {
     public:
         int breite;
@@ -185,16 +196,30 @@ pair<Graph, Graph> create_graph(string filename) {
 
 // Let states enter dead end paths but dont generate new States in dead end paths
 void prune_graph(Graph &G) {
+    vector<CoPair> pruned_vertices;
     for (size_t i = 0; i < G.V; i++) {
-        if (G.get_neighbors(i).size() == 1 && i != 0 && i != G.V - 1) {
+        if (G.get_neighbors(i).size() == 1 && i != 0 && i != G.V - 1 && G.gruben.find(i) == G.gruben.end()) {
             auto neighbor = G.get_neighbors(i)[0];
+            G.flags[i] = true;
             G.delete_edge(i, neighbor);
+            pruned_vertices.push_back(make_pair(i, neighbor));
             i = -1;
         }
     }
+    for (auto vertex: pruned_vertices) {
+        //G.add_edge(get<0>(vertex), get<1>(vertex));
+    }
 }
 
-vector<tuple<CoPair, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vertex, unordered_set<int> g1_gruben, unordered_set<int> g2_gruben) {
+int heuristic(CoPair state, int height, int width) {
+    auto x1 = state.first % width;
+    auto y1 = state.first / width;
+    auto x2 = state.second % width;
+    auto y2 = state.second / width;
+    return max(x1, x2) + max(y1, y2);
+}
+
+vector<tuple<CoPair, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vertex, unordered_set<int> g1_gruben, unordered_set<int> g2_gruben, bool back_traversing) {
     array<char, 4> directions = {'U', 'D', 'L', 'R'};
     vector<tuple<pair<int, int>, char>> neighbors;
     int n1, n2;
@@ -202,14 +227,19 @@ vector<tuple<CoPair, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vert
     for (auto d: directions) {
         int new_n1 = G1.edge_dir(n1, d);
         int new_n2 = G2.edge_dir(n2, d);
-        if (n1 != new_n1 || n2 != new_n2) {
+        
+        if (back_traversing == true) {
+            if (n1 != new_n1 && !G1.flags[new_n1] || n2 != new_n2 && !G2.flags[new_n2] && (g1_gruben.find(new_n1) == g1_gruben.end() && g2_gruben.find(new_n2) == g2_gruben.end())) {
+                    neighbors.push_back(make_tuple(make_pair(new_n1, new_n2), d));
+                }           
+        } else if (n1 != new_n1 && !G1.flags[new_n1] || n2 != new_n2 && !G2.flags[new_n2]) {
             if (g1_gruben.find(new_n1) != g1_gruben.end()) {
                 new_n1 = 0;
             }
             if (g2_gruben.find(new_n2) != g2_gruben.end()) {
                 new_n2 = 0;
             }
-            if (make_pair(new_n1, new_n2) == make_pair(0, 0)) {
+            if (new_n1 == 0 && new_n2 == 0) {
                 continue;
             } else {
                 neighbors.push_back(make_tuple(make_pair(new_n1, new_n2), d));
@@ -241,114 +271,11 @@ bool bfs_sp(Graph &G, int dest) {
     return false;
 }
 
-tuple<pair<ParentMap, ParentMap>, CoPair, float> bi_bfs(Graph &G1, Graph &G2, CoPair source, CoPair dest, int height, int width) {
+tuple<ParentMap, float> astar(Graph &G1, Graph &G2, CoPair source, CoPair dest, int height, int width) {
     auto start = chrono::high_resolution_clock::now();
 
-    queue<pair<int, int>> qs, qd;
-    set<pair<int, int>> visiteds, visitedd;
-    map<pair<int, int>, tuple<pair<int, int>, char>> parents, parentd;
-    bool break_flag = false;
-    pair<int, int> meeting_vertex;
-
-    qs.push(source);
-    qd.push(dest);
-    visiteds.insert(source);
-    visitedd.insert(dest);
-
-    while (!qs.empty() && !qd.empty()) {
-        if (break_flag) {
-            break;
-        }
-        if (qs.size() < qd.size()) {
-            pair<int, int> vertex = qs.front();
-            qs.pop();
-            for (auto neighbor: cart_prod(G1, G2, vertex, G1.gruben, G2.gruben)) {
-                if (visiteds.find(get<0>(neighbor)) == visiteds.end()) {
-                    visiteds.insert(get<0>(neighbor));
-                    qs.push(get<0>(neighbor));
-                    parents[get<0>(neighbor)] = make_tuple(vertex, get<1>(neighbor));
-                    if (visitedd.find(get<0>(neighbor)) != visitedd.end()) {
-                        meeting_vertex = get<0>(neighbor);
-                        break_flag = true;
-                        break;
-                    }
-                }
-            }
-        } else {
-            pair<int, int> vertex = qd.front();
-            qd.pop();
-            for (auto neighbor: cart_prod(G1, G2, vertex, G1.gruben, G2.gruben)) {
-                if (visitedd.find(get<0>(neighbor)) == visitedd.end()) {
-                    visitedd.insert(get<0>(neighbor));
-                    qd.push(get<0>(neighbor));
-                    parentd[get<0>(neighbor)] = make_tuple(vertex, get<1>(neighbor));
-                    if (visiteds.find(get<0>(neighbor)) != visiteds.end()) {
-                        meeting_vertex = get<0>(neighbor);
-                        break_flag = true;
-                        break;
-                    }
-                }
-            }
-        }
-    }
+    priority_queue<PqEl, vector<PqEl>, Comparator> pq;
+    set<CoPair> visited;
+    ParentMap parent;
     
-    auto end = chrono::high_resolution_clock::now();
-    float time = chrono::duration_cast<chrono::milliseconds>(end - start).count();
-    return make_tuple(make_pair(parents, parentd), meeting_vertex, time);
-}
-
-vector<char> bi_seq(ParentMap &parents, ParentMap &parentd, CoPair meeting_vertex, CoPair dest) {
-    vector<char> seq_s;
-    vector<char> seq_d;
-    map<char, char> reverse_dir = {
-        {'U', 'D'},
-        {'D', 'U'},
-        {'L', 'R'},
-        {'R', 'L'}
-    };
-    CoPair source = make_pair(0,0);
-    CoPair vertex = meeting_vertex;
-    while (vertex != source) {
-        seq_s.push_back(get<1>(parents[vertex]));
-        vertex = get<0>(parents[vertex]);
-    }
-    reverse(seq_s.begin(), seq_s.end());
-    vertex = meeting_vertex;
-    while (vertex != dest) {
-        seq_d.push_back(reverse_dir[get<1>(parentd[vertex])]);
-        vertex = get<0>(parentd[vertex]);
-    }
-    seq_s.insert(seq_s.end(), seq_d.begin(), seq_d.end());
-    return seq_s;
-}
-
-void print_path(vector<char> &seq) {
-    for (size_t i = 1; i < seq.size()+1; i++) {
-        std::cout << i << ": " << seq[i-1] << ";" << endl;
-    }
-    std::cout << std::endl;
-}
-
-void path_to_file(vector<char> &seq) {
-    
-}
-
-int main(int argc, char const *argv[]) {
-    string filebase = "auf2/data/labyrinthe";
-    for (size_t i = 0; i < 5; i++) {
-        string filename = filebase + to_string(i) + ".txt";
-        auto [G1, G2] = create_graph(filename);
-        if (bfs_sp(G1, G1.V - 1) && bfs_sp(G2, G2.V - 1)) {
-            CoPair source = make_pair(0, 0);
-            CoPair dest = make_pair(G1.V - 1, G2.V - 1);
-            prune_graph(G1);
-            prune_graph(G2);
-            auto [parents, meeting_vertex, time] = bi_bfs(G1, G2, source, dest, G1.hoehe, G1.breite);
-            auto seq = bi_seq(get<0>(parents), get<1>(parents), meeting_vertex, dest);
-            print_path(seq);
-            cerr << "Path length: " << seq.size() << endl;
-            cout << "Time: " << time << "ms" << endl;
-        }
-    }
-    return 0;
 }
