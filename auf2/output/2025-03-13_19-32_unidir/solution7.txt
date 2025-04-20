@@ -1,0 +1,4 @@
+Runtime for creating the graphs: 0.0007 s
+Runtime for running BFS on product graph: 0.2242 s
+
+No solution found...

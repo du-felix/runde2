@@ -207,7 +207,7 @@ void prune_graph(Graph &G) {
         }
     }
     for (auto vertex: pruned_vertices) {
-        //G.add_edge(get<0>(vertex), get<1>(vertex));
+        G.add_edge(get<0>(vertex), get<1>(vertex));
     }
 }
 
@@ -219,7 +219,7 @@ int heuristic(CoPair state, int height, int width) {
     return max(x1, x2) + max(y1, y2);
 }
 
-vector<tuple<CoPair, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vertex, unordered_set<int> g1_gruben, unordered_set<int> g2_gruben, bool back_traversing) {
+vector<tuple<CoPair, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vertex, unordered_set<int> g1_gruben, unordered_set<int> g2_gruben) {
     array<char, 4> directions = {'U', 'D', 'L', 'R'};
     vector<tuple<pair<int, int>, char>> neighbors;
     int n1, n2;
@@ -228,11 +228,7 @@ vector<tuple<CoPair, char>> cart_prod(Graph &G1, Graph &G2, tuple<int, int> vert
         int new_n1 = G1.edge_dir(n1, d);
         int new_n2 = G2.edge_dir(n2, d);
         
-        if (back_traversing == true) {
-            if (n1 != new_n1 && !G1.flags[new_n1] || n2 != new_n2 && !G2.flags[new_n2] && (g1_gruben.find(new_n1) == g1_gruben.end() && g2_gruben.find(new_n2) == g2_gruben.end())) {
-                    neighbors.push_back(make_tuple(make_pair(new_n1, new_n2), d));
-                }           
-        } else if (n1 != new_n1 && !G1.flags[new_n1] || n2 != new_n2 && !G2.flags[new_n2]) {
+    if (n1 != new_n1 && !G1.flags[new_n1] || n2 != new_n2 && !G2.flags[new_n2]) {
             if (g1_gruben.find(new_n1) != g1_gruben.end()) {
                 new_n1 = 0;
             }
@@ -277,5 +273,63 @@ tuple<ParentMap, float> astar(Graph &G1, Graph &G2, CoPair source, CoPair dest, 
     priority_queue<PqEl, vector<PqEl>, Comparator> pq;
     set<CoPair> visited;
     ParentMap parent;
-    
+    map<CoPair, int> cost;
+    cost[source] = 0;
+    G1.delete_neighbors(get<0>(dest));
+    G2.delete_neighbors(get<0>(dest));
+    pq.push(make_tuple(heuristic(source, height, width), source));
+    visited.insert(source);
+
+    while(!pq.empty()) {
+        auto vertex = pq.top();
+        pq.pop();
+        if (get<1>(vertex) == dest) {
+            break;
+        }
+        for (auto neighbor: cart_prod(G1, G2, get<1>(vertex), G1.gruben, G2.gruben)) {
+            if (visited.find(get<0>(neighbor)) == visited.end()) {
+                visited.insert(get<0>(neighbor));
+                parent[get<0>(neighbor)] = make_tuple(get<1>(vertex), get<1>(neighbor));
+                cost[get<0>(neighbor)] = cost[get<1>(vertex)] + 1;
+                pq.push(make_tuple(cost[get<0>(neighbor)] + heuristic(get<0>(neighbor), height, width), get<0>(neighbor)));
+            }
+        }
+    }
+    auto end = chrono::high_resolution_clock::now();
+    auto time = chrono::duration_cast<chrono::milliseconds>(end - start).count();
+    return make_tuple(parent, time);
+}
+
+vector<char> uni_seq(ParentMap &parent, CoPair dest) {
+    vector<char> seq;
+    pair<int, int> vertex = dest;
+    while (vertex != make_pair(0, 0)) {
+        seq.push_back(get<1>(parent[vertex]));
+        vertex = get<0>(parent[vertex]);
+    }
+    reverse(seq.begin(), seq.end());
+    return seq;
+}
+
+int main(int argc, char const *argv[]) {
+    string filebase = "auf2/data/labyrinthe";
+    for (size_t i = 5; i < 7; i++) {
+        string filename = filebase + to_string(i) + ".txt";
+        auto [G1, G2] = create_graph(filename);
+        CoPair source = make_pair(0, 0);
+        if (bfs_sp(G1, G1.V - 1) && bfs_sp(G2, G2.V - 1)) {
+            CoPair dest = make_pair(G1.V - 1, G2.V - 1);
+            prune_graph(G1);
+            prune_graph(G2);
+            auto [parents, time] = astar(G1, G2, source, dest, G1.hoehe, G1.breite);
+            auto seq = uni_seq(parents, dest);
+            // print_path(seq);
+            cout << "File Number: " << i << endl;
+            cout << "Path length: " << seq.size() << endl;
+            cout << "Time: " << time << "ms" << endl << endl;
+        } else {
+            cout << "File Number: " << i << endl;
+            cout << "No path found" << endl << endl;
+        }
+    }
 }

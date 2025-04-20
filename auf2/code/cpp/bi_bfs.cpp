@@ -265,8 +265,6 @@ tuple<pair<ParentMap, ParentMap>, CoPair, float> bi_bfs(Graph &G1, Graph &G2, Co
     qd.push(dest);
     visiteds.insert(source);
     visitedd.insert(dest);
-    //G1.delete_neighbors(get<0>(dest));
-    //G2.delete_neighbors(get<0>(dest));
 
     while (!qs.empty() && !qd.empty()) {
         if (break_flag) {
@@ -358,7 +356,6 @@ int main(int argc, char const *argv[]) {
             prune_graph(G2);
             auto [parents, meeting_vertex, time] = bi_bfs(G1, G2, source, dest, G1.hoehe, G1.breite);
             auto seq = bi_seq(get<0>(parents), get<1>(parents), meeting_vertex, dest);
-            cerr << "passed" << endl;
             // print_path(seq);
             cout << "File Number: " << i << endl;
             cout << "Path length: " << seq.size() << endl;

@@ -1,0 +1,38 @@
+Runtime for creating the graphs: 0.000432 s
+Runtime for running BFS on product graph: 0.002024 s
+
+1 Unten
+2 Unten
+3 Unten
+4 Rechts
+5 Oben
+6 Rechts
+7 Unten
+8 Rechts
+9 Oben
+10 Oben
+11 Rechts
+12 Links
+13 Links
+14 Oben
+15 Rechts
+16 Rechts
+17 Unten
+18 Unten
+19 Rechts
+20 Unten
+21 Unten
+22 Unten
+23 Links
+24 Oben
+25 Links
+26 Unten
+27 Links
+28 Oben
+29 Links
+30 Unten
+31 Unten
+32 Rechts
+33 Rechts
+34 Rechts
+35 Rechts

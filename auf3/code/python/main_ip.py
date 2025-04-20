@@ -1,6 +1,8 @@
 import os
 from pyscipopt import Model, quicksum
 from datetime import datetime
+import time
+
 
 # -1 entspricht unbekannt bzw. undefiniert.
 def create_binary_matrix(filename: str) -> list[list, int, int, list, bool]: # matrix, zeilen_anz, spalten_anz, known_line, bekannt
@@ -38,18 +40,59 @@ def modify_matrix(matrix):
         matrix[x].insert(0, 0)
     return matrix
 
-def ilp_model(matrix, r, c, line, line_bool, filename):
+def feasibility_model(matrix, r, c, line, line_bool, filename):
     mod_matrix = modify_matrix(matrix)
     model = Model(filename)
     indexset = {}
     for i in range(r):
         for j in range(c+2):
             if mod_matrix[i][j] == -1:
-                mod_matrix[i][j] = model.addVar(vtype="B", name=f"mod_matrix_{r}_{c}")
+                mod_matrix[i][j] = model.addVar(vtype="B", name=f"mod_matrix_{i}_{j}")
 
     for i in range(c+2):
         for j in range(c+2):
-            indexset[(i, j)] = model.addVar(vtype="B", name=f"permutation_{i}_{j}")
+            indexset[(i, j)] = model.addVar(vtype="B", name=f"indexset_{i}_{j}")
+    for n in range(c+2):
+        model.addCons(quicksum(indexset[(n, j)] for j in range(c+2)) == 1)
+        model.addCons(quicksum(indexset[(i, n)] for i in range(c+2)) == 1)
+    model.addCons(indexset[(0, 0)] == 1)
+    model.addCons(indexset[(c+1, c+1)] == 1)
+    permutation = {}
+    for i in range(r):
+        for j in range(c+2):
+            permutation[(i, j)] = model.addVar(vtype="B", name=f"permutation_{i}_{j}")
+            model.addCons(permutation[(i, j)] == quicksum(mod_matrix[i][n]*indexset[(n,j)] for n in range(c+2)))
+    if line_bool:
+        for j in range(c):
+            model.addCons(permutation[(0,j)]==line[j])
+    for i in range(r):
+        model.addCons(quicksum(permutation[(i, n)] + permutation[(i, n+1)] - 2 * permutation[(i, n)] * permutation[(i, n+1)] for n in range(c+1)) == 2)
+    return model
+
+def solve_feasibility(model: Model):
+    start = time.time()
+    model.setParam("limits/solutions", 2)
+    model.optimize()
+    end = time.time()
+
+    status = model.getStatus()
+    if status == "optimal" or status == "feasible":
+        return True, end-start
+    else:
+        return False, end-start
+
+def optimization_model(matrix, r, c, line, line_bool, filename):
+    mod_matrix = modify_matrix(matrix)
+    model = Model(filename)
+    indexset = {}
+    for i in range(r):
+        for j in range(c+2):
+            if mod_matrix[i][j] == -1:
+                mod_matrix[i][j] = model.addVar(vtype="B", name=f"mod_matrix_{i}_{j}")
+
+    for i in range(c+2):
+        for j in range(c+2):
+            indexset[(i, j)] = model.addVar(vtype="B", name=f"indexset_{i}_{j}")
     for n in range(c+2):
         model.addCons(quicksum(indexset[(n, j)] for j in range(c+2)) == 1)
         model.addCons(quicksum(indexset[(i, n)] for i in range(c+2)) == 1)
@@ -101,7 +144,9 @@ def create_timestamp_dir():
     return dir_path
 
 def file_solve_ilp(model: Model, filename: str, directory: str):
+    start = time.time()
     model.optimize()
+    end = time.time()
     status = model.getStatus()
 
     output = []
@@ -123,14 +168,68 @@ def file_solve_ilp(model: Model, filename: str, directory: str):
     
     print(f"Solution written to {file_path}")
 
+def feasibility_solution(model: Model, r: int, c: int):
+    permutation = [0] * c
+    dec_vars = {}
+    for i in range(c+2):
+        for j in range(c+2):
+            if model.getVal(model.getVar(f"indexset_{i}_{j}")) == 1 and i != 0 and i != c+1:
+                permutation[j-1] = i-1
+
+    all_vars = model.getVars()
+    mod_matrix_vars = [v for v in all_vars if v.name.startswith("mod_matrix_")]
+    for var in mod_matrix_vars:
+        i, j = map(int, var.name.split("_")[2:])
+        dec_vars[(i, j)] = model.getVal(var)
+    
+
+def optimization_solution(model: Model, r: int, c: int):
+    permutation = [0] * c
+    dec_vars = {}
+    bit_changes = []
+    for i in range(c+2):
+        for j in range(c+2):
+            if model.getVal(model.getVar(f"indexset_{i}_{j}")) == 1 and i != 0 and i != c+1:
+                permutation[j-1] = i-1
+
+    all_vars = model.getVars()
+    mod_matrix_vars = [v for v in all_vars if v.name.startswith("mod_matrix_")]
+    for var in mod_matrix_vars:
+        i, j = map(int, var.name.split("_")[2:])
+        dec_vars[(i, j)] = model.getVal(var)
+    
+    for i in range(r):
+        for j in range(c+2):
+            bit_change_vars = [v for v in all_vars if v.name.startswith("bit_change_")]
+    for var in bit_change_vars:
+        i, j = map(int, var.name.split("_")[2:])
+        #column j-1, row i
+        bit_changes.append((j-1, i))
+    return permutation, dec_vars, bit_changes
+
 if __name__ == "__main__":
-    directory = create_timestamp_dir()
-    #filenum = input("Enter the number of the file you want to use (00 - 13): ")
-    for filenum in ["11","12","05"]:
-        filename = f"auf3/data/konfetti{filenum}.txt"
+    current = os.getcwd() + "/auf2/output/"
+    folder_path = os.path.join(current, str(datetime.now().strftime("%m-%d_%H-%M_astar"))) + "/"
+    os.makedirs(folder_path, exist_ok=True)
+    input_files = map(int,input("Welche Dateien sollen getestet werden? Nummern mit Leerzeichen trennen: ").split())
+    for _ in input_files:
+        filename = f"auf3/data/konfetti{_}.txt"
         matrix, r, c, zeile, zeile_gegeben = create_binary_matrix(filename)
-        model = ilp_model(matrix, r, c, zeile, zeile_gegeben, filename)
-        file_solve_ilp(model, f"solution{filenum}.txt", directory)
+        feasibility = feasibility_model(matrix, r, c, zeile, zeile_gegeben, filename)
+        boolean, feasibility_time = solve_feasibility(feasibility)
+        if boolean:
+            print("Problem is feasible. Therefore, a valid permutation exists.")
+            solutions = feasibility.getSols()
+            if len(solutions) > 1:
+                print("Multiple solutions found.")
+            else:
+                print("Only one solution found.")
+
+        else:
+            print("Problem is infeasible. Therefore, a valid permutation only exists via bit changes.")
+            optimization = optimization_model(matrix, r, c, zeile, zeile_gegeben, filename)
+            permutation, decision_vars, bit_changes = optimization_solution(optimization, r, c)
+            opt_value = optimization.getObjVal()
 
 while False:
         # Quasi inverse Funktion zu create_binary_matrix

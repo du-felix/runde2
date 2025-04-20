@@ -1,0 +1,15 @@
+Laufzeit zum Lösen des Modells: 0.022 s
+Gesamtlaufzeit: 0.021 s
+Total Length: 13.5 cm
+
+| Zeichen   |   Kosten |    Wort |
+|-----------|----------|---------|
+| a         |        1 |       0 |
+|           |       11 |     101 |
+| b         |       11 |     110 |
+| c         |       11 | 1000000 |
+| d         |       12 |    1001 |
+| e         |       13 |   10001 |
+| f         |       14 |  100001 |
+| g         |       15 |     111 |
+| h         |       15 | 1000001 |
